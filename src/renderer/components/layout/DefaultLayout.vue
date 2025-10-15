@@ -3,7 +3,7 @@ import HeaderLayout from '@/renderer/components/layout/HeaderLayout.vue'
 </script>
 
 <template>
-  <v-app>
+  <v-app theme="dark">
     <v-layout>
       <HeaderLayout />
       <v-main>

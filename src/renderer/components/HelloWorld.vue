@@ -27,6 +27,8 @@ const getModsByApi = async (
   modIdList: string[],
   page: number = 1
 ): Promise<SptMod[]> => {
+  if (!modIdList || !modIdList.length) return []
+
   loadingPages.value = page
 
   const json = await getMods(modIdList.join(','), page)
@@ -191,15 +193,8 @@ watch(
 </script>
 
 <template>
-  <v-container
-    class="mt-0"
-    max-width="1200"
-  >
+  <v-container class="mt-0">
     <div>
-      <div class="mb-8 text-center">
-        <h1 class="text-h2 font-weight-bold"> SPT MOD Version Track </h1>
-      </div>
-
       <div>
         <v-card
           class="pa-2 d-flex justify-lg-space-between"

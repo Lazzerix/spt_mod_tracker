@@ -1,20 +1,12 @@
 {
-  "name": "vutron",
-  "appId": "com.vutron.vutron",
+  "name": "spt mode tracker",
+  "appId": "spt.mod.tracker",
   "version": "1.0.0",
-  "description": "Quick Start Templates for Vite + Vue 3 + Electron",
-  "homepage": "https://vutron.cdget.com",
-  "author": "CDGet <jooy2.contact@gmail.com>",
+  "description": "spt mode tracker",
+  "author": "HioP  <hiopvkashu@gmail.com>",
   "license": "MIT",
   "main": "dist/main/index.js",
   "private": true,
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/jooy2/vutron.git"
-  },
-  "bugs": {
-    "url": "https://github.com/jooy2/vutron/issues"
-  },
   "debug": {
     "env": {
       "VITE_DEV_SERVER_URL": "http://localhost:5173"

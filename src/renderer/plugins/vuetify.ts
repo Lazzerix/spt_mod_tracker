@@ -42,16 +42,10 @@ export default createVuetify({
   },
   theme: {
     themes: {
-      light: {
-        dark: false,
-        colors: {
-          primary: colors.green.darken2
-        }
-      },
       dark: {
         dark: true,
         colors: {
-          primary: colors.green.darken4
+          primary: colors.blueGrey.darken1
         }
       }
     }
