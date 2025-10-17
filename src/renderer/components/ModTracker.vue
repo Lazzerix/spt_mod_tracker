@@ -375,7 +375,7 @@ watch(
               </v-chip>
               <a
                 href="#"
-                @click="openExternal(mod.url)"
+                @click="openExternal(mod.url as string)"
                 >{{ mod.name }} ({{ mod.version }})
               </a>
               <v-chip
