@@ -374,10 +374,10 @@ watch(
                 {{ mod?.spt_version ? mod?.spt_version : '??????' }}
               </v-chip>
               <a
-                :href="mod.url"
-                target="_blank"
-                >{{ mod.name }} ({{ mod.version }})</a
-              >
+                href="#"
+                @click="openExternal(mod.url)"
+                >{{ mod.name }} ({{ mod.version }})
+              </a>
               <v-chip
                 color="error"
                 @click="removeMode(mod.id)"

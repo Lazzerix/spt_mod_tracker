@@ -1,5 +1,5 @@
 <script setup lang="tsx">
-import HelloWorld from '@/renderer/components/HelloWorld.vue'
+import HelloWorld from '@/renderer/components/ModTracker.vue'
 </script>
 
 <template>
