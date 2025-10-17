@@ -23,9 +23,12 @@ const lastModLength = ref(-1)
 const loading = ref(false)
 
 const loadingPages = ref(0)
+const error = ref('')
 
 const importExport = ref('')
 const token = ref('')
+
+const showImportExport = ref(false)
 
 const getModsByApi = async (
   modIdList: string[],
@@ -44,6 +47,8 @@ const getModsByApi = async (
   }
 
   for (const modId of modIdList) {
+    if (!loading.value) break
+
     const mod: { id: number; name: string; detail_url: string } | undefined =
       mods.find((m) => m.id === Number.parseInt(modId))
 
@@ -76,7 +81,7 @@ const getModsByApi = async (
     }
   }
 
-  if (mods.length > 0) {
+  if (mods.length > 0 && loading.value) {
     return sptMods.concat(await getModsByApi(modIdList, page + 1))
   } else {
     return sptMods
@@ -151,10 +156,15 @@ const getColorByVersionDiff = (
 
 const exportMods = () => {
   importExport.value = btoa(JSON.stringify(modIdList.value))
+
+  showImportExport.value = !showImportExport.value
 }
 
 const importMods = () => {
-  localStorage.setItem('modUrlList', atob(importExport.value))
+  if (showImportExport.value) {
+    localStorage.setItem('modUrlList', atob(importExport.value))
+  }
+  showImportExport.value = !showImportExport.value
 }
 
 const openSptForgeForApiKey = () => {
@@ -212,28 +222,40 @@ watch(
       return
     }
 
-    loading.value = true
-    modList.value = await getModsByApi(modIdList.value)
+    try {
+      loading.value = true
+      modList.value = await getModsByApi(modIdList.value)
 
-    const emptyMods: SptMod[] = []
+      const emptyMods: SptMod[] = []
 
-    modIdList.value.forEach((modId) => {
-      if (!modList.value.find((m) => modId === m.id)) {
-        emptyMods.push({
-          name: modId,
-          id: modId
-        } as SptMod)
-      }
-    })
+      modIdList.value.forEach((modId) => {
+        if (!modList.value.find((m) => modId === m.id)) {
+          emptyMods.push({
+            name: modId,
+            id: modId
+          } as SptMod)
+        }
+      })
 
-    modList.value = modList.value.concat(emptyMods)
-    modList.value.sort((a, b) => Number.parseInt(a.id) - Number.parseInt(b.id))
+      modList.value = modList.value.concat(emptyMods)
+      modList.value.sort(
+        (a, b) => Number.parseInt(a.id) - Number.parseInt(b.id)
+      )
 
-    lastModLength.value = modList.value.length
-    loading.value = false
+      lastModLength.value = modList.value.length
+      loading.value = false
+    } catch (e) {
+      console.log('error', e)
+      error.value = e as string
+      loading.value = false
+    }
   },
   { deep: true }
 )
+
+const reloadPage = () => {
+  location.reload()
+}
 </script>
 
 <template>
@@ -250,10 +272,18 @@ watch(
             class="d-flex"
             v-if="store.token"
           >
-            <div>
+            <div class="d-flex">
+              <v-btn
+                v-tooltip="'reload app'"
+                class="mr-2"
+                color="success"
+                variant="tonal"
+                @click="reloadPage"
+                ><span class="font-weight-bold">⟳</span></v-btn
+              >
               <v-text-field
                 v-model="modUrlForAdd"
-                width="500px"
+                width="250px"
                 class="mr-2"
                 variant="outlined"
                 density="compact"
@@ -337,7 +367,7 @@ watch(
           </div>
         </v-card>
         <v-card
-          v-if="importExport.length"
+          v-if="showImportExport"
           class="mt-0 pa-2"
           color="surface-variant"
           variant="tonal"
@@ -398,6 +428,12 @@ watch(
           </span>
         </v-card>
       </div>
+      <v-alert
+        v-if="error"
+        variant="flat"
+        type="error"
+        >{{ error }}</v-alert
+      >
     </div>
   </v-container>
 </template>
