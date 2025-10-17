@@ -1,8 +1,9 @@
 /* eslint-disable */
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
 import { getMods, getVersions } from '../utils/api'
+import { useMainStore } from '@/renderer/store/main'
+import { openExternal } from '@/renderer/utils'
 
 interface SptMod {
   id: string
@@ -12,16 +13,19 @@ interface SptMod {
   version?: string
 }
 
-const router = useRouter()
-const route = useRoute()
+const defaultSptVersion = '~4.0.1'
+const store = useMainStore()
 const modIdList = ref<string[]>([])
 const modUrlForAdd = ref<string>('')
 const modList = ref<SptMod[]>([])
-const currentVersionSpt = ref<string>('~4.0.0')
+const currentVersionSpt = ref<string>(defaultSptVersion)
 const lastModLength = ref(-1)
 const loading = ref(false)
+
 const loadingPages = ref(0)
-const exportUrl = ref('')
+
+const importExport = ref('')
+const token = ref('')
 
 const getModsByApi = async (
   modIdList: string[],
@@ -31,39 +35,48 @@ const getModsByApi = async (
 
   loadingPages.value = page
 
-  const json = await getMods(modIdList.join(','), page)
+  const modRequest = await getMods(modIdList.join(','), page)
+  const mods = modRequest?.data ?? []
 
   const sptMods: SptMod[] = []
+  if (!mods.length) {
+    return sptMods
+  }
 
-  for (let i: number = 0; i < (json?.data ?? []).length; i++) {
-    const mod: { id: number; name: string; detail_url: string } = json.data[i]
+  for (const modId of modIdList) {
+    const mod: { id: number; name: string; detail_url: string } | undefined =
+      mods.find((m) => m.id === Number.parseInt(modId))
 
-    try {
-      let result: {
-        data: { version: string; spt_version_constraint: string }[]
-        meta: { current_page: number; last_page: number }
-      } = await getModVersionByApi(mod.id)
+    if (mod) {
+      try {
+        let result: {
+          data: { version: string; spt_version_constraint: string }[]
+          meta: { current_page: number; last_page: number }
+        } = await getModVersionByApi(mod.id)
 
-      if (result.meta.last_page !== result.meta.current_page) {
-        result = await getModVersionByApi(mod.id, result.meta.last_page)
+        store.setModLoading(mod.name)
+
+        if (result.meta.last_page !== result.meta.current_page) {
+          result = await getModVersionByApi(mod.id, result.meta.last_page)
+        }
+
+        const version = result.data[result.data.length - 1]
+
+        sptMods.push({
+          name:
+            mod.name.length > 50 ? mod.name.substring(0, 50) + '...' : mod.name,
+          id: mod.id.toString(),
+          spt_version: version.spt_version_constraint,
+          version: version.version,
+          url: mod?.detail_url
+        } as SptMod)
+      } catch (e) {
+        console.warn(mod.id, e)
       }
-
-      const version = result.data[result.data.length - 1]
-
-      sptMods.push({
-        name:
-          mod.name.length > 50 ? mod.name.substring(0, 50) + '...' : mod.name,
-        id: mod.id.toString(),
-        spt_version: version.spt_version_constraint,
-        version: version.version,
-        url: mod.detail_url
-      } as SptMod)
-    } catch (e) {
-      console.warn(mod.id, e)
     }
   }
 
-  if (sptMods.length > 0) {
+  if (mods.length > 0) {
     return sptMods.concat(await getModsByApi(modIdList, page + 1))
   } else {
     return sptMods
@@ -137,53 +150,84 @@ const getColorByVersionDiff = (
 }
 
 const exportMods = () => {
-  const encoded = btoa(JSON.stringify(modIdList.value))
-  router.push({
-    query: {
-      mods: btoa(JSON.stringify(modIdList.value))
-    }
-  })
-
-  exportUrl.value = `${location.origin}/?mods=${encoded}`
+  importExport.value = btoa(JSON.stringify(modIdList.value))
 }
 
-const modsFromUrl = computed(() => {
-  const mods = route.query['mods']
-  if (!mods?.length) {
-    return []
-  }
+const importMods = () => {
+  localStorage.setItem('modUrlList', atob(importExport.value))
+}
 
-  return JSON.parse(atob(route.query['mods'] as string)) as string[]
-})
+const openSptForgeForApiKey = () => {
+  openExternal('https://forge.sp-tarkov.com/user/api-tokens')
+}
 
-const editMods = () => {
-  localStorage.setItem('modUrlList', JSON.stringify(modsFromUrl.value))
-  router.push({
-    query: {}
-  })
-  exportUrl.value = ''
+const signIn = () => {
+  if (!localStorage.getItem('token')) return
+
+  store.setToken(localStorage.getItem('token'))
+  loadModList()
+}
+
+const signUp = () => {
+  localStorage.setItem('token', token.value)
+  store.setToken(token.value)
+  loadModList()
+}
+
+const logout = () => {
+  localStorage.removeItem('token')
+  modList.value = []
+  store.setToken(null)
+}
+
+const loadModList = () => {
+  modIdList.value = JSON.parse(localStorage.getItem('modUrlList') ?? '[]')
+}
+
+const loadCurrentSptVersion = () => {
+  currentVersionSpt.value =
+    localStorage.getItem('currentVersionSpt') ?? defaultSptVersion
 }
 
 onMounted(async () => {
-  if (modsFromUrl.value.length > 0) {
-    modIdList.value = modsFromUrl.value
-    //modList.value = await getModsByApi(modIdList.value)
-  } else {
-    modIdList.value = JSON.parse(localStorage.getItem('modUrlList') ?? '[]')
-    //modList.value = await getModsByApi(modIdList.value)
-  }
+  signIn()
+
+  if (!store.token) return
+  loadCurrentSptVersion()
+  loadModList()
 })
+
+watch(
+  () => currentVersionSpt.value,
+  () => {
+    localStorage.setItem('currentVersionSpt', currentVersionSpt.value)
+  }
+)
 
 watch(
   () => modIdList,
   async () => {
-    if (lastModLength.value >= modIdList.value.length) {
+    if (lastModLength.value >= modIdList.value.length && modList.value.length) {
       lastModLength.value = modIdList.value.length
       return
     }
 
     loading.value = true
     modList.value = await getModsByApi(modIdList.value)
+
+    const emptyMods: SptMod[] = []
+
+    modIdList.value.forEach((modId) => {
+      if (!modList.value.find((m) => modId === m.id)) {
+        emptyMods.push({
+          name: modId,
+          id: modId
+        } as SptMod)
+      }
+    })
+
+    modList.value = modList.value.concat(emptyMods)
+    modList.value.sort((a, b) => Number.parseInt(a.id) - Number.parseInt(b.id))
 
     lastModLength.value = modList.value.length
     loading.value = false
@@ -202,10 +246,12 @@ watch(
           rounded="lg"
           variant="tonal"
         >
-          <div class="d-flex">
+          <div
+            class="d-flex"
+            v-if="store.token"
+          >
             <div>
               <v-text-field
-                :disabled="modsFromUrl.length > 0"
                 v-model="modUrlForAdd"
                 width="500px"
                 class="mr-2"
@@ -217,14 +263,12 @@ watch(
               />
             </div>
             <v-btn
-              :disabled="modsFromUrl.length > 0"
               color="success"
               text="Add"
               variant="tonal"
               @click="addMod(modUrlForAdd)"
             />
             <v-btn
-              :disabled="modsFromUrl.length > 0"
               class="ml-2"
               color="warning"
               text="Export"
@@ -232,18 +276,47 @@ watch(
               @click="exportMods"
             />
             <v-btn
-              v-if="modsFromUrl.length > 0"
               class="ml-2"
               color="warning"
-              text="Edit"
+              text="Import"
               variant="tonal"
-              @click="editMods"
+              @click="importMods"
             />
           </div>
 
-          <div class="d-flex">
-            <div class="ml-5">
+          <div>
+            <div class="ml-5 d-flex flex-row">
+              <div class="mr-2 d-flex flex-row">
+                <v-text-field
+                  v-if="!store.token"
+                  v-model="token"
+                  width="300px"
+                  class="mr-2"
+                  variant="outlined"
+                  density="compact"
+                  label='API KEY with  "read" permission'
+                >
+                  <template #details
+                    ><a
+                      href="#"
+                      @click="openSptForgeForApiKey"
+                      >get api key from spt-forge</a
+                    ></template
+                  >
+                </v-text-field>
+                <v-btn
+                  :disabled="!token"
+                  v-if="!store.token"
+                  color="success"
+                  variant="tonal"
+                  @click="signUp"
+                >
+                  Login
+                </v-btn>
+              </div>
+
               <v-text-field
+                v-if="store.token"
                 v-model="currentVersionSpt"
                 width="300px"
                 class="mr-2"
@@ -252,20 +325,28 @@ watch(
                 label="Current version SPT"
                 hide-details
               />
+              <v-btn
+                :disabled="loading"
+                v-if="store.token"
+                color="error"
+                variant="tonal"
+                @click="logout"
+                >Logout</v-btn
+              >
             </div>
           </div>
         </v-card>
         <v-card
-          v-if="exportUrl.length"
+          v-if="importExport.length"
           class="mt-0 pa-2"
           color="surface-variant"
           variant="tonal"
-          title="Export"
+          title="Export/Import"
         >
           <v-textarea
             variant="outlined"
-            v-model="exportUrl"
-            hint="You can share a link to your mod set"
+            v-model="importExport"
+            hint="This encoded string is needed to quickly import your mod pack"
             persistent-hint
           />
         </v-card>
@@ -307,10 +388,13 @@ watch(
               </v-chip>
             </div>
           </template>
+          <span v-else-if="!store.token"
+            >Must login before tracking spt mods</span
+          >
           <span v-else-if="!modIdList.length">Add at least one mod</span>
-          <span v-if="loading && modIdList.length > 0">
+          <span v-if="store.token && loading && modIdList.length > 0">
             <v-progress-circular indeterminate />
-            page {{ loadingPages }}
+            page {{ loadingPages }} {{ store.modLoading }}
           </span>
         </v-card>
       </div>
@@ -321,5 +405,8 @@ watch(
 <style>
 .v-btn {
   height: 40px !important;
+}
+.utf-icon {
+  font-saize: 30px;
 }
 </style>

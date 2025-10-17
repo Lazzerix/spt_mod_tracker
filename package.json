@@ -1,7 +1,7 @@
 {
-  "name": "spt mode tracker",
+  "name": "spt_mode_tracker",
   "appId": "spt.mod.tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "spt mode tracker",
   "author": "HioP  <hiopvkashu@gmail.com>",
   "license": "MIT",
