@@ -1,6 +1,5 @@
 <h2>STP MOD TRACKER</h2>
 
---------------
 Allows you to create a mod list and visually display the version status of these mods relative to the selected SPT version.
 
 Features:
