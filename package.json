@@ -1,9 +1,9 @@
 {
-  "name": "sptModeTracker",
+  "name": "sptModTracker",
   "appId": "spt.mod.tracker",
-  "version": "1.0.4",
-  "description": "spt mode tracker",
-  "author": "HioP  <hiopvkashu@gmail.com>",
+  "version": "1.0.5",
+  "description": "spt mod tracker",
+  "author": "HioP <hiopvkashu@gmail.com>",
   "license": "MIT",
   "main": "dist/main/index.js",
   "private": true,
