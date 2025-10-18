@@ -105,12 +105,16 @@ const addMod = async (newMode: string | null | undefined) => {
 const removeMode = (idStringForRemove: string | undefined | null) => {
   if (idStringForRemove === null) return
 
-  store.loadedMods.splice(
-    store.loadedMods.indexOf(
-      store.loadedMods.find((m: SptMod) => m.id === idStringForRemove) as SptMod
+  const copyLoadedMods = [...store.loadedMods]
+
+  copyLoadedMods.splice(
+    copyLoadedMods.indexOf(
+      copyLoadedMods.find((m: SptMod) => m.id === idStringForRemove) as SptMod
     ),
     1
   )
+  store.setLoadedMods(copyLoadedMods)
+
   modIdList.value.splice(
     modIdList.value.indexOf(
       modIdList.value.find(
@@ -121,6 +125,7 @@ const removeMode = (idStringForRemove: string | undefined | null) => {
   )
 
   localStorage.setItem('modUrlList', JSON.stringify(modIdList.value))
+  loadModIdList()
 }
 
 /**
@@ -156,14 +161,32 @@ const getColorByVersionDiff = (
   return 'error'
 }
 
+const removeAllMods = () => {
+  localStorage.removeItem('loadedMods')
+  localStorage.removeItem('modUrlList')
+  location.reload()
+}
+
 const exportMods = () => {
   importExportString.value = btoa(JSON.stringify(modIdList.value))
 }
 
-const importMods = () => {
+const importMods = (replace: boolean = true) => {
   if (importExportString.value) {
-    localStorage.setItem('modUrlList', atob(importExportString.value))
-    updateLoadedMods(modIdList.value)
+    const newIdMods = JSON.parse(atob(importExportString.value))
+
+    if (replace) {
+      localStorage.setItem('modUrlList', JSON.stringify(newIdMods))
+    } else {
+      localStorage.setItem(
+        'modUrlList',
+        JSON.stringify([...new Set(modIdList.value.concat(newIdMods))])
+      )
+    }
+
+    store.setLoadedMods([])
+    loadModIdList()
+    //updateLoadedMods(modIdList.value)
   }
 }
 
@@ -219,7 +242,10 @@ const forceUpdateOutdatedMods = async () => {
 const updateLoadedMods = async (modIds: string[]) => {
   loading.value = true
   try {
-    const updatedMods = await getModsByApi(modIds)
+    store.setModLoading('')
+
+    const updatedMods = modIds.length ? await getModsByApi(modIds) : []
+
     let mergedMods = [] as SptMod[]
     mergedMods = mergedMods.concat(updatedMods)
 
@@ -230,14 +256,19 @@ const updateLoadedMods = async (modIds: string[]) => {
     })
 
     store.setLoadedMods(mergedMods)
-
-    localStorage.setItem('loadedMods', JSON.stringify(store.loadedMods))
   } catch (e) {
     console.log('error', e)
     error.value = e as string
   }
   loading.value = false
 }
+
+watch(
+  () => showImportExport.value,
+  () => {
+    if (showImportExport.value) exportMods()
+  }
+)
 
 watch(
   () => currentVersionSpt.value,
@@ -314,7 +345,7 @@ watch(
                     <v-list-item>
                       <v-btn
                         color="warning"
-                        text="Export/Import"
+                        text="Export / Import / Remove"
                         variant="tonal"
                         @click="showImportExport = true"
                       />
@@ -322,16 +353,7 @@ watch(
 
                     <v-list-item class="mt-2">
                       <v-btn
-                        :disabled="!token"
-                        v-if="!store.token"
-                        color="success"
-                        variant="tonal"
-                        @click="signUp"
-                      >
-                        Login
-                      </v-btn>
-                      <v-btn
-                        v-else
+                        v-if="store.token"
                         color="error"
                         variant="tonal"
                         @click="logout"
@@ -401,6 +423,14 @@ watch(
                     ></template
                   >
                 </v-text-field>
+                <v-btn
+                  v-if="!store.token"
+                  color="success"
+                  variant="tonal"
+                  @click="signUp"
+                >
+                  Login
+                </v-btn>
               </div>
 
               <v-text-field
@@ -421,8 +451,18 @@ watch(
           class="mt-0 pa-2"
           color="surface-variant"
           variant="tonal"
-          title="Export/Import"
         >
+          <v-card-title
+            >Export / Import
+            <v-btn
+              class="ml-2"
+              color="error"
+              variant="tonal"
+              @click="showImportExport = false"
+            >
+              Close
+            </v-btn></v-card-title
+          >
           <v-textarea
             variant="outlined"
             v-model="importExportString"
@@ -439,18 +479,23 @@ watch(
             <v-btn
               :disabled="!importExportString"
               color="warning"
-              text="Import"
+              text="Import (add)"
               variant="tonal"
-              @click="importMods"
+              @click="importMods(false)"
             />
             <v-btn
-              class="ml-2"
-              color="error"
+              :disabled="!importExportString"
+              color="warning"
+              text="Import (replace)"
               variant="tonal"
-              @click="showImportExport = false"
-            >
-              Close
-            </v-btn>
+              @click="importMods(true)"
+            />
+            <v-btn
+              color="error"
+              text="REMOVE ALL MODS"
+              variant="tonal"
+              @click="removeAllMods"
+            />
           </v-card-actions>
         </v-card>
       </div>

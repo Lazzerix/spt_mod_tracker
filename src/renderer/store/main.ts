@@ -30,6 +30,8 @@ export const useMainStore = defineStore('main', () => {
     loadedMods.value.sort(
       (a, b) => Number.parseInt(a.id) - Number.parseInt(b.id)
     )
+
+    localStorage.setItem('loadedMods', JSON.stringify(loadedMods.value))
   }
 
   return {
