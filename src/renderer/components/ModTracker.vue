@@ -2,30 +2,20 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { getMods, getVersions } from '../utils/api'
-import { useMainStore } from '@/renderer/store/main'
+import { SptMod, useMainStore } from '@/renderer/store/main'
 import { openExternal } from '@/renderer/utils'
-
-interface SptMod {
-  id: string
-  name: string
-  url?: string
-  spt_version?: string
-  version?: string
-}
 
 const defaultSptVersion = '~4.0.1'
 const store = useMainStore()
 const modIdList = ref<string[]>([])
 const modUrlForAdd = ref<string>('')
-const modList = ref<SptMod[]>([])
 const currentVersionSpt = ref<string>(defaultSptVersion)
-const lastModLength = ref(-1)
 const loading = ref(false)
 
 const loadingPages = ref(0)
 const error = ref('')
 
-const importExport = ref('')
+const importExportString = ref('')
 const token = ref('')
 
 const showImportExport = ref(false)
@@ -92,12 +82,21 @@ const getModVersionByApi = async (id: number, page: number = 1) => {
   return await getVersions(id, page)
 }
 
-const addMod = (newMode: string | null | undefined) => {
+const addMod = async (newMode: string | null | undefined) => {
   if (!newMode) return
 
   if (newMode.includes('https://forge.sp-tarkov.com')) {
+    const newModId = newMode.split('/').slice(-2)[0]
+
+    if (modIdList.value.includes(newModId)) {
+      modUrlForAdd.value = ''
+      return
+    }
+
     modIdList.value.push(newMode.split('/').slice(-2)[0])
     localStorage.setItem('modUrlList', JSON.stringify(modIdList.value))
+
+    await updateLoadedMods([newModId])
   }
 
   modUrlForAdd.value = ''
@@ -106,9 +105,9 @@ const addMod = (newMode: string | null | undefined) => {
 const removeMode = (idStringForRemove: string | undefined | null) => {
   if (idStringForRemove === null) return
 
-  modList.value.splice(
-    modList.value.indexOf(
-      modList.value.find((m: SptMod) => m.id === idStringForRemove) as SptMod
+  store.loadedMods.splice(
+    store.loadedMods.indexOf(
+      store.loadedMods.find((m: SptMod) => m.id === idStringForRemove) as SptMod
     ),
     1
   )
@@ -124,29 +123,32 @@ const removeMode = (idStringForRemove: string | undefined | null) => {
   localStorage.setItem('modUrlList', JSON.stringify(modIdList.value))
 }
 
+/**
+ * Compares the currently selected version with the passed mod version
+ * @param modVersion mod version
+ */
 const getColorByVersionDiff = (
   modVersion: string | null | undefined
 ): 'success' | 'warning' | 'error' | 'info' => {
   try {
     if (!modVersion) return 'info'
 
-    const currentVersionSplit = currentVersionSpt.value.split('.')
-    const modVersionSplit = modVersion.split('.')
+    const [major1, minor1, patch1] = currentVersionSpt.value
+      .replace(/[^\d.]/g, '')
+      .split('.')
+      .map(Number)
 
-    currentVersionSplit[0] = currentVersionSplit[0].replace('~', '')
-    modVersionSplit[0] = modVersionSplit[0].replace('~', '')
+    const [major2, minor2, patch2] = modVersion
+      .replace(/[^\d.]/g, '')
+      .split('.')
+      .map(Number)
 
-    const isMajorEqual = currentVersionSplit[0] === modVersionSplit[0]
-    const isMinorEqual = currentVersionSplit[1] === modVersionSplit[1]
-    const isPatchEqual = currentVersionSplit[2] === modVersionSplit[2]
-
-    if (isMajorEqual && isMinorEqual && isPatchEqual) {
+    if (major1 === major2 && minor1 === minor2 && patch1 === patch2)
       return 'success'
-    } else if (isMajorEqual && isMinorEqual) {
-      return 'success'
-    } else if (isMajorEqual) {
-      return 'warning'
-    }
+    if (major1 === major2 && minor1 === minor2) return 'success'
+    if (major1 === major2) return 'warning'
+
+    return 'error'
   } catch (e) {
     console.warn('Error from version diff', e)
   }
@@ -155,16 +157,14 @@ const getColorByVersionDiff = (
 }
 
 const exportMods = () => {
-  importExport.value = btoa(JSON.stringify(modIdList.value))
-
-  showImportExport.value = !showImportExport.value
+  importExportString.value = btoa(JSON.stringify(modIdList.value))
 }
 
 const importMods = () => {
-  if (showImportExport.value) {
-    localStorage.setItem('modUrlList', atob(importExport.value))
+  if (importExportString.value) {
+    localStorage.setItem('modUrlList', atob(importExportString.value))
+    updateLoadedMods(modIdList.value)
   }
-  showImportExport.value = !showImportExport.value
 }
 
 const openSptForgeForApiKey = () => {
@@ -175,22 +175,21 @@ const signIn = () => {
   if (!localStorage.getItem('token')) return
 
   store.setToken(localStorage.getItem('token'))
-  loadModList()
+  loadModIdList()
 }
 
 const signUp = () => {
   localStorage.setItem('token', token.value)
   store.setToken(token.value)
-  loadModList()
+  loadModIdList()
 }
 
 const logout = () => {
   localStorage.removeItem('token')
-  modList.value = []
   store.setToken(null)
 }
 
-const loadModList = () => {
+const loadModIdList = () => {
   modIdList.value = JSON.parse(localStorage.getItem('modUrlList') ?? '[]')
 }
 
@@ -204,8 +203,41 @@ onMounted(async () => {
 
   if (!store.token) return
   loadCurrentSptVersion()
-  loadModList()
+  loadModIdList()
 })
+
+const forceUpdateOutdatedMods = async () => {
+  const modIdsForUpdate = store.loadedMods
+    .filter((mod: SptMod) => {
+      return getColorByVersionDiff(mod.spt_version) !== 'success'
+    })
+    .map((mod: SptMod) => mod.id)
+
+  await updateLoadedMods(modIdsForUpdate)
+}
+
+const updateLoadedMods = async (modIds: string[]) => {
+  loading.value = true
+  try {
+    const updatedMods = await getModsByApi(modIds)
+    let mergedMods = [] as SptMod[]
+    mergedMods = mergedMods.concat(updatedMods)
+
+    store.loadedMods.forEach((exist: SptMod) => {
+      if (!mergedMods.find((updated) => updated.id === exist.id)) {
+        mergedMods.push(exist)
+      }
+    })
+
+    store.setLoadedMods(mergedMods)
+
+    localStorage.setItem('loadedMods', JSON.stringify(store.loadedMods))
+  } catch (e) {
+    console.log('error', e)
+    error.value = e as string
+  }
+  loading.value = false
+}
 
 watch(
   () => currentVersionSpt.value,
@@ -217,19 +249,27 @@ watch(
 watch(
   () => modIdList,
   async () => {
-    if (lastModLength.value >= modIdList.value.length && modList.value.length) {
-      lastModLength.value = modIdList.value.length
-      return
-    }
-
     try {
-      loading.value = true
-      modList.value = await getModsByApi(modIdList.value)
+      const loadedModsString = localStorage.getItem('loadedMods')
+      store.setLoadedMods(
+        JSON.parse(
+          loadedModsString && loadedModsString.length > 0
+            ? loadedModsString
+            : '[]'
+        )
+      )
 
+      if (store.loadedMods.length) {
+        return
+      }
+
+      await updateLoadedMods(modIdList.value)
+
+      loading.value = true
       const emptyMods: SptMod[] = []
 
       modIdList.value.forEach((modId) => {
-        if (!modList.value.find((m) => modId === m.id)) {
+        if (!store.loadedMods.find((m: SptMod) => modId === m.id)) {
           emptyMods.push({
             name: modId,
             id: modId
@@ -237,12 +277,10 @@ watch(
         }
       })
 
-      modList.value = modList.value.concat(emptyMods)
-      modList.value.sort(
-        (a, b) => Number.parseInt(a.id) - Number.parseInt(b.id)
-      )
+      store.setLoadedMods(store.loadedMods.concat(emptyMods))
 
-      lastModLength.value = modList.value.length
+      localStorage.setItem('loadedMods', JSON.stringify(store.loadedMods))
+
       loading.value = false
     } catch (e) {
       console.log('error', e)
@@ -252,10 +290,6 @@ watch(
   },
   { deep: true }
 )
-
-const reloadPage = () => {
-  location.reload()
-}
 </script>
 
 <template>
@@ -273,14 +307,61 @@ const reloadPage = () => {
             v-if="store.token"
           >
             <div class="d-flex">
+              <v-btn class="mr-2">
+                <span class="utf-icon">☰</span>
+                <v-menu activator="parent">
+                  <v-list>
+                    <v-list-item>
+                      <v-btn
+                        color="warning"
+                        text="Export/Import"
+                        variant="tonal"
+                        @click="showImportExport = true"
+                      />
+                    </v-list-item>
+
+                    <v-list-item class="mt-2">
+                      <v-btn
+                        :disabled="!token"
+                        v-if="!store.token"
+                        color="success"
+                        variant="tonal"
+                        @click="signUp"
+                      >
+                        Login
+                      </v-btn>
+                      <v-btn
+                        v-else
+                        color="error"
+                        variant="tonal"
+                        @click="logout"
+                        >Logout</v-btn
+                      >
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
+              </v-btn>
+
               <v-btn
-                v-tooltip="'reload app'"
+                v-tooltip:bottom="'update all mods'"
+                :loading="loading"
                 class="mr-2"
                 color="success"
                 variant="tonal"
-                @click="reloadPage"
+                @click="updateLoadedMods(modIdList)"
                 ><span class="font-weight-bold">⟳</span></v-btn
               >
+
+              <v-btn
+                v-tooltip:bottom="'update only old version mods'"
+                :loading="loading"
+                class="mr-2"
+                color="warning"
+                variant="tonal"
+                @click="forceUpdateOutdatedMods"
+                ><span class="font-weight-bold">⟳</span></v-btn
+              >
+
               <v-text-field
                 v-model="modUrlForAdd"
                 width="250px"
@@ -297,20 +378,6 @@ const reloadPage = () => {
               text="Add"
               variant="tonal"
               @click="addMod(modUrlForAdd)"
-            />
-            <v-btn
-              class="ml-2"
-              color="warning"
-              text="Export"
-              variant="tonal"
-              @click="exportMods"
-            />
-            <v-btn
-              class="ml-2"
-              color="warning"
-              text="Import"
-              variant="tonal"
-              @click="importMods"
             />
           </div>
 
@@ -334,15 +401,6 @@ const reloadPage = () => {
                     ></template
                   >
                 </v-text-field>
-                <v-btn
-                  :disabled="!token"
-                  v-if="!store.token"
-                  color="success"
-                  variant="tonal"
-                  @click="signUp"
-                >
-                  Login
-                </v-btn>
               </div>
 
               <v-text-field
@@ -355,14 +413,6 @@ const reloadPage = () => {
                 label="Current version SPT"
                 hide-details
               />
-              <v-btn
-                :disabled="loading"
-                v-if="store.token"
-                color="error"
-                variant="tonal"
-                @click="logout"
-                >Logout</v-btn
-              >
             </div>
           </div>
         </v-card>
@@ -375,10 +425,33 @@ const reloadPage = () => {
         >
           <v-textarea
             variant="outlined"
-            v-model="importExport"
+            v-model="importExportString"
             hint="This encoded string is needed to quickly import your mod pack"
             persistent-hint
           />
+          <v-card-actions>
+            <v-btn
+              color="warning"
+              text="Export"
+              variant="tonal"
+              @click="exportMods"
+            />
+            <v-btn
+              :disabled="!importExportString"
+              color="warning"
+              text="Import"
+              variant="tonal"
+              @click="importMods"
+            />
+            <v-btn
+              class="ml-2"
+              color="error"
+              variant="tonal"
+              @click="showImportExport = false"
+            >
+              Close
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </div>
 
@@ -390,10 +463,10 @@ const reloadPage = () => {
           rounded="lg"
           variant="tonal"
         >
-          <template v-if="modList.length">
+          <template v-if="store.loadedMods.length">
             <div
               class="mb-1"
-              v-for="mod in modList"
+              v-for="mod in store.loadedMods"
               :key="mod.name"
             >
               <v-chip
@@ -406,7 +479,8 @@ const reloadPage = () => {
               <a
                 href="#"
                 @click="openExternal(mod.url as string)"
-                >{{ mod.name }} ({{ mod.version }})
+              >
+                {{ mod.name }} ({{ mod.version }})
               </a>
               <v-chip
                 color="error"
