@@ -2,8 +2,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { getMods, getVersions } from '../utils/api'
-import { SptMod, useMainStore } from '@/renderer/store/main'
+import { SptMod, SptModHistory, useMainStore } from '@/renderer/store/main'
 import { openExternal } from '@/renderer/utils'
+import ModHistoryDialog from '@/renderer/components/ModHistoryDialog.vue'
 
 const defaultSptVersion = '~4.0.1'
 const store = useMainStore()
@@ -186,7 +187,6 @@ const importMods = (replace: boolean = true) => {
 
     store.setLoadedMods([])
     loadModIdList()
-    //updateLoadedMods(modIdList.value)
   }
 }
 
@@ -250,7 +250,17 @@ const updateLoadedMods = async (modIds: string[]) => {
     mergedMods = mergedMods.concat(updatedMods)
 
     store.loadedMods.forEach((exist: SptMod) => {
-      if (!mergedMods.find((updated) => updated.id === exist.id)) {
+      const updated = mergedMods.find((updated) => updated.id === exist.id)
+      if (updated) {
+        store.addToModHistory({
+          mod: updated,
+          updated: Date.now(),
+          old_version: exist.version,
+          new_version: updated.version,
+          old_spt_version: exist.spt_version,
+          new_spt_version: updated.spt_version
+        } as SptModHistory)
+      } else {
         mergedMods.push(exist)
       }
     })
@@ -396,11 +406,14 @@ watch(
               />
             </div>
             <v-btn
+              class="mr-2"
               color="success"
               text="Add"
               variant="tonal"
               @click="addMod(modUrlForAdd)"
             />
+
+            <ModHistoryDialog />
           </div>
 
           <div>
