@@ -6,6 +6,8 @@
   "author": "HioP <hiopvkashu@gmail.com>",
   "license": "MIT",
   "main": "dist/main/index.js",
+  "homepage": "https://forge.sp-tarkov.com/mod/2378/spt-mod-tracker",
+  "repository": "https://github.com/hiop/spt_mod_tracker",
   "private": true,
   "debug": {
     "env": {
