@@ -251,7 +251,11 @@ const updateLoadedMods = async (modIds: string[]) => {
 
     store.loadedMods.forEach((exist: SptMod) => {
       const updated = mergedMods.find((updated) => updated.id === exist.id)
-      if (updated) {
+
+      const isSptUpdate = updated?.spt_version !== exist.spt_version
+      const isModUpdate = updated?.version !== exist.version
+
+      if (updated && (isSptUpdate || isModUpdate)) {
         store.addToModHistory({
           mod: updated,
           updated: Date.now(),
@@ -260,7 +264,7 @@ const updateLoadedMods = async (modIds: string[]) => {
           old_spt_version: exist.spt_version,
           new_spt_version: updated.spt_version
         } as SptModHistory)
-      } else {
+      } else if (!updated) {
         mergedMods.push(exist)
       }
     })

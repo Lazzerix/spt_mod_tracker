@@ -85,6 +85,7 @@ watch(
 
                 <div>
                   <v-chip>
+                    <span class="mr-2">MOD</span>
                     <span v-if="history.old_version != history.new_version">
                       {{ history.old_version }} →
                       {{ history.new_version }}
@@ -94,6 +95,7 @@ watch(
                     </span>
                   </v-chip>
                   <v-chip>
+                    <span class="mr-2">SPT</span>
                     <span
                       class="version-update"
                       v-if="history.old_spt_version != history.new_spt_version"
