@@ -9,7 +9,8 @@ log.transports.console.format = '{h}:{i}:{s}.{ms} {text}'
 const mainAvailChannels: string[] = [
   'msgRequestGetVersion',
   'msgOpenExternalLink',
-  'msgOpenFile'
+  'msgOpenFile',
+  'msgShowNotification'
 ]
 const rendererAvailChannels: string[] = []
 

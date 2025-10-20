@@ -7,6 +7,7 @@ import { join } from 'path'
 let mainWindow
 let errorWindow
 
+app.setAppUserModelId(Constants.APP_NAME)
 const initializeMainLogger = () => {
   log.initialize({
     includeFutureSessions: false,

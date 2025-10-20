@@ -38,6 +38,80 @@ export const useMainStore = defineStore('main', () => {
   const loadedMods = ref<SptMod[]>([])
   // update history
   const modHistory = ref<SptModHistory[]>([])
+  // automatic tracker interval id
+  const automaticTrackingIntervalId = ref<number | null>(null)
+
+  //settings
+  const automaticTrackingEnable = ref<boolean>(false)
+  const automaticTrackingNotification = ref<boolean>(false)
+  const automaticTrackingDelay = ref<number>(30)
+
+  function setAutomaticTrackingIntervalId(timeoutId: number) {
+    automaticTrackingIntervalId.value = timeoutId
+  }
+
+  function clearAutomaticTrackingIntervalId() {
+    if (!automaticTrackingIntervalId.value) return
+
+    clearInterval(automaticTrackingIntervalId.value as number)
+    automaticTrackingIntervalId.value = null
+  }
+
+  function setAutomaticTrackingEnable(state: boolean) {
+    automaticTrackingEnable.value = state
+    localStorage.setItem(
+      'automaticTrackingEnable',
+      JSON.stringify(automaticTrackingEnable.value)
+    )
+
+    if (!state) {
+      clearAutomaticTrackingIntervalId()
+    }
+  }
+  function setAutomaticTrackingNotification(state: boolean) {
+    automaticTrackingNotification.value = state
+    localStorage.setItem(
+      'automaticTrackingNotification',
+      JSON.stringify(automaticTrackingEnable.value)
+    )
+  }
+  function setAutomaticTrackingDelay(delay: number) {
+    console.log('store setAutomaticTrackingDelay', delay)
+
+    automaticTrackingDelay.value = delay > 1 && delay < 180 ? delay - 1 : delay
+    localStorage.setItem(
+      'automaticTrackingDelay',
+      automaticTrackingDelay.value.toString()
+    )
+
+    clearAutomaticTrackingIntervalId()
+  }
+
+  function loadAutomaticTrackingEnable() {
+    const state: boolean = localStorage.getItem('automaticTrackingEnable')
+      ? JSON.parse(localStorage.getItem('automaticTrackingEnable') as string)
+      : false
+
+    automaticTrackingEnable.value = state
+  }
+  function loadAutomaticTrackingNotification() {
+    const state: boolean = localStorage.getItem('automaticTrackingNotification')
+      ? JSON.parse(
+          localStorage.getItem('automaticTrackingNotification') as string
+        )
+      : false
+
+    automaticTrackingNotification.value = state
+  }
+  function loadAutomaticTrackingDelay() {
+    const delay: number = localStorage.getItem('automaticTrackingDelay')
+      ? Number.parseInt(
+          localStorage.getItem('automaticTrackingDelay') as string
+        )
+      : 30
+
+    automaticTrackingDelay.value = delay
+  }
 
   function setModLoading(m: string) {
     modLoading.value = m
@@ -71,6 +145,22 @@ export const useMainStore = defineStore('main', () => {
     setLoadedMods,
 
     modHistory,
-    addToModHistory
+    addToModHistory,
+
+    automaticTrackingEnable,
+    setAutomaticTrackingEnable,
+    loadAutomaticTrackingEnable,
+
+    automaticTrackingNotification,
+    setAutomaticTrackingNotification,
+    loadAutomaticTrackingNotification,
+
+    automaticTrackingDelay,
+    setAutomaticTrackingDelay,
+    loadAutomaticTrackingDelay,
+
+    automaticTrackingIntervalId,
+    setAutomaticTrackingIntervalId,
+    clearAutomaticTrackingIntervalId
   }
 })

@@ -51,7 +51,7 @@ export default class Constants {
     enabled: false,
     trayWindow: false,
     menu: false,
-    tooltip: 'Vutron App',
+    tooltip: 'SPT Mod Tracker',
     margin: { x: 0, y: 0 },
     showAtStartup: false
   }

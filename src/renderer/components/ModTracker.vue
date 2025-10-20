@@ -3,8 +3,9 @@
 import { onMounted, ref, watch } from 'vue'
 import { getMods, getVersions } from '../utils/api'
 import { SptMod, SptModHistory, useMainStore } from '@/renderer/store/main'
-import { openExternal } from '@/renderer/utils'
+import { openExternal, sendNotification } from '@/renderer/utils'
 import ModHistoryDialog from '@/renderer/components/ModHistoryDialog.vue'
+import ModSettingsDialog from '@/renderer/components/ModSettingsDialog.vue'
 
 const defaultSptVersion = '~4.0.1'
 const store = useMainStore()
@@ -20,6 +21,7 @@ const importExportString = ref('')
 const token = ref('')
 
 const showImportExport = ref(false)
+const showSettings = ref(false)
 
 const getModsByApi = async (
   modIdList: string[],
@@ -227,6 +229,11 @@ onMounted(async () => {
   if (!store.token) return
   loadCurrentSptVersion()
   loadModIdList()
+
+  store.loadAutomaticTrackingEnable()
+  store.loadAutomaticTrackingDelay()
+  store.loadAutomaticTrackingNotification()
+  toggleAutomaticTrackingInterval()
 })
 
 const forceUpdateOutdatedMods = async () => {
@@ -240,12 +247,16 @@ const forceUpdateOutdatedMods = async () => {
 }
 
 const updateLoadedMods = async (modIds: string[]) => {
+  const isInterval = store.automaticTrackingIntervalId !== null
+  store.clearAutomaticTrackingIntervalId()
+
   loading.value = true
   try {
     store.setModLoading('')
 
     const updatedMods = modIds.length ? await getModsByApi(modIds) : []
 
+    const modNamesForNotification: string[] = []
     let mergedMods = [] as SptMod[]
     mergedMods = mergedMods.concat(updatedMods)
 
@@ -256,6 +267,7 @@ const updateLoadedMods = async (modIds: string[]) => {
       const isModUpdate = updated?.version !== exist.version
 
       if (updated && (isSptUpdate || isModUpdate)) {
+        modNamesForNotification.push(updated.name)
         store.addToModHistory({
           mod: updated,
           updated: Date.now(),
@@ -269,12 +281,39 @@ const updateLoadedMods = async (modIds: string[]) => {
       }
     })
 
+    if (
+      store.automaticTrackingNotification &&
+      modNamesForNotification.length > 0
+    ) {
+      await sendNotification(
+        'Updated:',
+        modNamesForNotification.map((modName) => `- ${modName}`).join(' \n')
+      )
+    }
+
     store.setLoadedMods(mergedMods)
   } catch (e) {
     console.log('error', e)
     error.value = e as string
   }
+
   loading.value = false
+  if (isInterval) toggleAutomaticTrackingInterval()
+}
+
+const toggleAutomaticTrackingInterval = () => {
+  if (!store.automaticTrackingEnable) return
+
+  if (store.automaticTrackingIntervalId) {
+    store.clearAutomaticTrackingIntervalId()
+  } else {
+    store.setAutomaticTrackingIntervalId(
+      window.setInterval(
+        () => updateLoadedMods(modIdList.value),
+        store.automaticTrackingDelay * 60 * 1000
+      )
+    )
+  }
 }
 
 watch(
@@ -329,6 +368,7 @@ watch(
       loading.value = false
     } catch (e) {
       console.log('error', e)
+
       error.value = e as string
       loading.value = false
     }
@@ -352,10 +392,18 @@ watch(
             v-if="store.token"
           >
             <div class="d-flex">
-              <v-btn class="mr-2">
+              <v-btn class="mr-4">
                 <span class="utf-icon">☰</span>
                 <v-menu activator="parent">
                   <v-list>
+                    <v-list-item>
+                      <v-btn
+                        color="warning"
+                        text="Settings"
+                        variant="tonal"
+                        @click="showSettings = true"
+                      />
+                    </v-list-item>
                     <v-list-item>
                       <v-btn
                         color="warning"
@@ -378,7 +426,36 @@ watch(
                 </v-menu>
               </v-btn>
 
+              <v-badge
+                v-if="store.automaticTrackingEnable"
+                offset-x="20"
+                offset-y="8"
+                :color="store.automaticTrackingIntervalId ? 'info' : 'error'"
+                stacked
+                :content="
+                  store.automaticTrackingIntervalId
+                    ? `${store.automaticTrackingDelay}m`
+                    : ''
+                "
+              >
+                <v-btn
+                  class="mr-2"
+                  :loading="loading"
+                  @click="toggleAutomaticTrackingInterval"
+                  v-tooltip="
+                    `update all mods every ${store.automaticTrackingDelay}m`
+                  "
+                  :color="
+                    store.automaticTrackingIntervalId ? 'success' : 'error'
+                  "
+                  variant="flat"
+                >
+                  ⏰
+                </v-btn>
+              </v-badge>
+
               <v-btn
+                :disabled="store.automaticTrackingIntervalId != null"
                 v-tooltip:bottom="'update all mods'"
                 :loading="loading"
                 class="mr-2"
@@ -389,6 +466,7 @@ watch(
               >
 
               <v-btn
+                :disabled="store.automaticTrackingIntervalId != null"
                 v-tooltip:bottom="'update only old version mods'"
                 :loading="loading"
                 class="mr-2"
@@ -568,9 +646,11 @@ watch(
         v-if="error"
         variant="flat"
         type="error"
-        >{{ error }}</v-alert
       >
+        {{ error }}
+      </v-alert>
     </div>
+    <ModSettingsDialog v-model:dialog="showSettings" />
   </v-container>
 </template>
 

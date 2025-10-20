@@ -9,3 +9,10 @@ export async function openExternal(url: string): Promise<void> {
 export async function openFile(type: string): Promise<any> {
   return window.mainApi.invoke('msgOpenFile', type)
 }
+
+export async function sendNotification(
+  title: string,
+  body: string
+): Promise<void> {
+  await window.mainApi.send('msgShowNotification', title, body)
+}

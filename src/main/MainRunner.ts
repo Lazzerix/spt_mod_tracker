@@ -2,7 +2,8 @@ import {
   app,
   BrowserWindow,
   RenderProcessGoneDetails,
-  BrowserWindowConstructorOptions
+  BrowserWindowConstructorOptions,
+  Notification
 } from 'electron'
 import Constants, { TrayOptions } from './utils/Constants'
 import IPCs from './IPCs'
@@ -15,7 +16,7 @@ const options = {
   tray: {
     // all optional values from DEFAULT_TRAY_OPTIONS can de defined here
     enabled: true,
-    menu: false, // true, to use a tray menu ; false to toggle visibility on click on tray icon
+    menu: true, // true, to use a tray menu ; false to toggle visibility on click on tray icon
     trayWindow: false // true, to use a tray floating window attached to top try icon
   }
 }
@@ -74,6 +75,10 @@ export const createMainWindow = async (): Promise<BrowserWindow> => {
   const mainWindow = new BrowserWindow(opt)
 
   mainWindow.setMenu(null)
+
+  mainWindow.on('minimize', (event: Event): void => {
+    mainWindow.hide()
+  })
 
   mainWindow.on('close', (event: Event): void => {
     event.preventDefault()

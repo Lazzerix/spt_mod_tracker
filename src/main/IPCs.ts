@@ -1,4 +1,4 @@
-import { ipcMain, shell, IpcMainEvent, dialog } from 'electron'
+import { ipcMain, shell, IpcMainEvent, dialog, Notification } from 'electron'
 import Constants from './utils/Constants'
 
 /*
@@ -6,6 +6,13 @@ import Constants from './utils/Constants'
  * */
 export default class IPCs {
   static initialize(): void {
+    //Show notification
+    ipcMain.on(
+      'msgShowNotification',
+      async (event: IpcMainEvent, title: string, body: string) => {
+        new Notification({ title, body }).show()
+      }
+    )
     // Get application version
     ipcMain.handle('msgRequestGetVersion', () => {
       return Constants.APP_VERSION
