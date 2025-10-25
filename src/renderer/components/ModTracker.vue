@@ -227,13 +227,21 @@ onMounted(async () => {
   signIn()
 
   if (!store.token) return
-  loadCurrentSptVersion()
-  loadModIdList()
 
   store.loadAutomaticTrackingEnable()
   store.loadAutomaticTrackingDelay()
   store.loadAutomaticTrackingNotification()
+  store.loadUpdateOnAppStart()
+
+  loadCurrentSptVersion()
+  loadModIdList()
   toggleAutomaticTrackingInterval()
+
+  if (store.updateOnAppStart) {
+    setTimeout(() => {
+      updateLoadedMods(modIdList.value)
+    }, 100)
+  }
 })
 
 const forceUpdateOutdatedMods = async () => {
@@ -247,6 +255,11 @@ const forceUpdateOutdatedMods = async () => {
 }
 
 const updateLoadedMods = async (modIds: string[]) => {
+  if (loading.value) {
+    console.warn('update in process')
+    return
+  }
+
   const isInterval = store.automaticTrackingIntervalId !== null
   store.clearAutomaticTrackingIntervalId()
 

@@ -24,6 +24,15 @@ const automaticTrackingNotification = computed({
   }
 })
 
+const updateOnAppStart = computed({
+  get() {
+    return store.updateOnAppStart
+  },
+  set(state) {
+    store.setUpdateOnAppStart(state)
+  }
+})
+
 const automaticTrackingDelay = computed({
   get() {
     return store.automaticTrackingDelay
@@ -46,7 +55,14 @@ const testNotification = () => {
     >
       <v-card title="Settings">
         <v-card-text>
-          <h2>Notification</h2>
+          <v-checkbox
+            density="compact"
+            v-model="updateOnAppStart"
+            label="Enable update all mods on app start"
+            hide-details
+          />
+
+          <h2 class="mt-10">Notification</h2>
           <v-checkbox
             density="compact"
             v-model="automaticTrackingNotification"

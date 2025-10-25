@@ -45,9 +45,19 @@ export const useMainStore = defineStore('main', () => {
   const automaticTrackingEnable = ref<boolean>(false)
   const automaticTrackingNotification = ref<boolean>(false)
   const automaticTrackingDelay = ref<number>(30)
+  const updateOnAppStart = ref<boolean>(false)
 
   function setAutomaticTrackingIntervalId(timeoutId: number) {
     automaticTrackingIntervalId.value = timeoutId
+  }
+
+  function setUpdateOnAppStart(state: boolean) {
+    updateOnAppStart.value = state
+
+    localStorage.setItem(
+      'updateOnAppStart',
+      JSON.stringify(updateOnAppStart.value)
+    )
   }
 
   function clearAutomaticTrackingIntervalId() {
@@ -76,8 +86,6 @@ export const useMainStore = defineStore('main', () => {
     )
   }
   function setAutomaticTrackingDelay(delay: number) {
-    console.log('store setAutomaticTrackingDelay', delay)
-
     automaticTrackingDelay.value = delay > 1 && delay < 180 ? delay - 1 : delay
     localStorage.setItem(
       'automaticTrackingDelay',
@@ -87,6 +95,14 @@ export const useMainStore = defineStore('main', () => {
     clearAutomaticTrackingIntervalId()
   }
 
+  function loadUpdateOnAppStart() {
+    const state: boolean = localStorage.getItem('updateOnAppStart')
+      ? JSON.parse(localStorage.getItem('updateOnAppStart') as string)
+      : false
+
+    updateOnAppStart.value = state
+  }
+
   function loadAutomaticTrackingEnable() {
     const state: boolean = localStorage.getItem('automaticTrackingEnable')
       ? JSON.parse(localStorage.getItem('automaticTrackingEnable') as string)
@@ -94,6 +110,7 @@ export const useMainStore = defineStore('main', () => {
 
     automaticTrackingEnable.value = state
   }
+
   function loadAutomaticTrackingNotification() {
     const state: boolean = localStorage.getItem('automaticTrackingNotification')
       ? JSON.parse(
@@ -161,6 +178,10 @@ export const useMainStore = defineStore('main', () => {
 
     automaticTrackingIntervalId,
     setAutomaticTrackingIntervalId,
-    clearAutomaticTrackingIntervalId
+    clearAutomaticTrackingIntervalId,
+
+    updateOnAppStart,
+    setUpdateOnAppStart,
+    loadUpdateOnAppStart
   }
 })
