@@ -395,8 +395,7 @@ function errorToJSON(error: unknown): string {
       name: error.name,
       message: error.message,
       stack: error.stack?.split('\n').map((line) => line.trim()),
-      // Дополнительные поля, которые могут быть у кастомных ошибок
-      ...error
+      additionalInfo: error
     }
     return JSON.stringify(errorObj, null, 2)
   }
