@@ -307,7 +307,7 @@ const updateLoadedMods = async (modIds: string[]) => {
     store.setLoadedMods(mergedMods)
   } catch (e) {
     console.log('error', e)
-    error.value = e as string
+    error.value = errorToJSON(e)
   }
 
   loading.value = false
@@ -382,12 +382,26 @@ watch(
     } catch (e) {
       console.log('error', e)
 
-      error.value = e as string
+      error.value = errorToJSON(e)
       loading.value = false
     }
   },
   { deep: true }
 )
+
+function errorToJSON(error: unknown): string {
+  if (error instanceof Error) {
+    const errorObj = {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').map((line) => line.trim()),
+      // Дополнительные поля, которые могут быть у кастомных ошибок
+      ...error
+    }
+    return JSON.stringify(errorObj, null, 2)
+  }
+  return JSON.stringify({ value: String(error) }, null, 2)
+}
 </script>
 
 <template>
@@ -656,11 +670,15 @@ watch(
         </v-card>
       </div>
       <v-alert
+        class="mt-2"
         v-if="error"
         variant="flat"
         type="error"
       >
-        {{ error }}
+        <v-textarea
+          auto-grow
+          v-model="error"
+        ></v-textarea>
       </v-alert>
     </div>
     <ModSettingsDialog v-model:dialog="showSettings" />
