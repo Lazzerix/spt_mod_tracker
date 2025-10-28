@@ -58,14 +58,23 @@ const getModsByApi = async (
           result = await getModVersionByApi(mod.id, result.meta.last_page)
         }
 
-        const version = result.data[result.data.length - 1]
+        let currentBestVer = result.data[0]
+        // Check results for most compatible version
+        for (let ver of result.data) {
+          if (
+            getVersionDiff(ver.spt_version_constraint) <
+            getVersionDiff(currentBestVer.spt_version_constraint)
+          ) {
+            currentBestVer = ver
+          }
+        }
 
         sptMods.push({
           name:
             mod.name.length > 50 ? mod.name.substring(0, 50) + '...' : mod.name,
           id: mod.id.toString(),
-          spt_version: version.spt_version_constraint,
-          version: version.version,
+          spt_version: currentBestVer.spt_version_constraint,
+          version: currentBestVer.version,
           url: mod?.detail_url
         } as SptMod)
       } catch (e) {
@@ -79,6 +88,32 @@ const getModsByApi = async (
   } else {
     return sptMods
   }
+}
+
+const getVersionDiff = (modVersion: string | null | undefined): number => {
+  try {
+    if (!modVersion) return 100
+    let [sptMajor, sptMinor, sptPatch] = currentVersionSpt.value
+      .replace(/[^\d.]/g, '')
+      .split('.')
+      .map(Number)
+
+    let [modMajor, modMinor, modPatch] = modVersion
+      .replace(/[^\d.]/g, '')
+      .split('.')
+      .map(Number)
+
+    if (modMinor === undefined || modMinor === null) modMinor = 0
+    if (sptMajor === modMajor && sptMinor === modMinor && sptPatch === modPatch)
+      return 0 //perfect
+    if (sptMajor === modMajor && sptMinor === modMinor) return 1 //compatible
+    if (sptMajor === modMajor) return 2 // possible problems
+
+    return 3 //compatible
+  } catch (e) {
+    console.warn('Error from version diff', e)
+  }
+  return 3 //compatible
 }
 
 const getModVersionByApi = async (id: number, page: number = 1) => {
@@ -141,20 +176,21 @@ const getColorByVersionDiff = (
   try {
     if (!modVersion) return 'info'
 
-    const [major1, minor1, patch1] = currentVersionSpt.value
+    let [sptMajor, sptMinor, sptPatch] = currentVersionSpt.value
       .replace(/[^\d.]/g, '')
       .split('.')
       .map(Number)
 
-    const [major2, minor2, patch2] = modVersion
+    let [modMajor, modMinor, modPatch] = modVersion
       .replace(/[^\d.]/g, '')
       .split('.')
       .map(Number)
 
-    if (major1 === major2 && minor1 === minor2 && patch1 === patch2)
+    if (modMinor === undefined || modMinor === null) modMinor = 0
+    if (sptMajor === modMajor && sptMinor === modMinor && sptPatch === modPatch)
       return 'success'
-    if (major1 === major2 && minor1 === minor2) return 'success'
-    if (major1 === major2) return 'warning'
+    if (sptMajor === modMajor && sptMinor === modMinor) return 'success'
+    if (sptMajor === modMajor) return 'warning'
 
     return 'error'
   } catch (e) {
