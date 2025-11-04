@@ -60,12 +60,17 @@ const getModsByApi = async (
 
         let currentBestVer = result.data[0]
         // Check results for most compatible version
-        for (let ver of result.data) {
+        for (let candidate of result.data) {
+          // if candidate is more compatible candidate is the best version
+          // if candidate and currentBestVer are equally compatible check if candidate is newer than currentBestVer if so candidate is the best version
           if (
-            getVersionDiff(ver.spt_version_constraint) <
-            getVersionDiff(currentBestVer.spt_version_constraint)
+            getVersionDiff(candidate.spt_version_constraint) <
+              getVersionDiff(currentBestVer.spt_version_constraint) ||
+            (getVersionDiff(candidate.spt_version_constraint) ===
+              getVersionDiff(currentBestVer.spt_version_constraint) &&
+              isModANewerThanModB(candidate, currentBestVer))
           ) {
-            currentBestVer = ver
+            currentBestVer = candidate
           }
         }
 
@@ -90,6 +95,36 @@ const getModsByApi = async (
   }
 }
 
+const isModANewerThanModB = (
+  modA: { version: string; spt_version_constraint: string },
+  modB: { version: string; spt_version_constraint: string }
+): boolean => {
+  let [modAMajor, modAMinor, modAPatch] = modA.version
+    .replace(/[^\d.]/g, '')
+    .split('.')
+    .map(Number)
+  let [modBMajor, modBMinor, modBPatch] = modB.version
+    .replace(/[^\d.]/g, '')
+    .split('.')
+    .map(Number)
+
+  // in case a mod doesn't have a minor or major version set it to 0 to prevent problems
+  if (modAMinor === undefined || modAMinor === null) modAMinor = 0
+  if (modAPatch === undefined || modAPatch === null) modAPatch = 0
+  if (modBMinor === undefined || modBMinor === null) modBMinor = 0
+  if (modBPatch === undefined || modBPatch === null) modBPatch = 0
+  if (modAMajor > modBMajor) {
+    return true
+  }
+  if (modAMinor > modBMinor) {
+    return true
+  }
+  if (modAPatch > modBPatch) {
+    return true
+  }
+  return false
+}
+
 const getVersionDiff = (modVersion: string | null | undefined): number => {
   try {
     if (!modVersion) return 100
@@ -103,7 +138,9 @@ const getVersionDiff = (modVersion: string | null | undefined): number => {
       .split('.')
       .map(Number)
 
+    // in case a mod doesn't have a minor or major version set it to 0 to prevent problems
     if (modMinor === undefined || modMinor === null) modMinor = 0
+    if (modPatch === undefined || modPatch === null) modPatch = 0
     if (sptMajor === modMajor && sptMinor === modMinor && sptPatch === modPatch)
       return 0 //perfect
     if (sptMajor === modMajor && sptMinor === modMinor) return 1 //compatible
@@ -481,8 +518,9 @@ function errorToJSON(error: unknown): string {
                         color="error"
                         variant="tonal"
                         @click="logout"
-                        >Logout</v-btn
                       >
+                        Logout
+                      </v-btn>
                     </v-list-item>
                   </v-list>
                 </v-menu>
@@ -524,8 +562,9 @@ function errorToJSON(error: unknown): string {
                 color="success"
                 variant="tonal"
                 @click="updateLoadedMods(modIdList)"
-                ><span class="font-weight-bold">⟳</span></v-btn
               >
+                <span class="font-weight-bold">⟳</span>
+              </v-btn>
 
               <v-btn
                 :disabled="store.automaticTrackingIntervalId != null"
@@ -535,8 +574,9 @@ function errorToJSON(error: unknown): string {
                 color="warning"
                 variant="tonal"
                 @click="forceUpdateOutdatedMods"
-                ><span class="font-weight-bold">⟳</span></v-btn
               >
+                <span class="font-weight-bold">⟳</span>
+              </v-btn>
 
               <v-text-field
                 v-model="modUrlForAdd"
@@ -572,13 +612,13 @@ function errorToJSON(error: unknown): string {
                   density="compact"
                   label='API KEY with  "read" permission'
                 >
-                  <template #details
-                    ><a
+                  <template #details>
+                    <a
                       href="#"
                       @click="openSptForgeForApiKey"
                       >get api key from spt-forge</a
-                    ></template
-                  >
+                    >
+                  </template>
                 </v-text-field>
                 <v-btn
                   v-if="!store.token"
@@ -609,8 +649,8 @@ function errorToJSON(error: unknown): string {
           color="surface-variant"
           variant="tonal"
         >
-          <v-card-title
-            >Export / Import
+          <v-card-title>
+            Export / Import
             <v-btn
               class="ml-2"
               color="error"
@@ -618,8 +658,8 @@ function errorToJSON(error: unknown): string {
               @click="showImportExport = false"
             >
               Close
-            </v-btn></v-card-title
-          >
+            </v-btn>
+          </v-card-title>
           <v-textarea
             variant="outlined"
             v-model="importExportString"
@@ -713,7 +753,7 @@ function errorToJSON(error: unknown): string {
         <v-textarea
           auto-grow
           v-model="error"
-        ></v-textarea>
+        />
       </v-alert>
     </div>
     <ModSettingsDialog v-model:dialog="showSettings" />
